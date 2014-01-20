@@ -4,7 +4,7 @@ import sys
 import os
 
 backlog = 50
-MAX_DATA_ERCV = 81920
+MAX_DATA_RECV = 81920
 
 def main():
     host = ''
@@ -20,18 +20,20 @@ def main():
         sys.exit(1)
 
     while 1:
-        #create a BP socket
         conn, client_addr = proxy.accept()
-        thread.start_new_thread(BPS, (conn, client_addr))
+        #create a BP socket
+        thread.start_new_thread(BPS, (proxy, conn, client_addr))
             
     proxy.close()
 
-def BPS(conn, client_addr):
-    request = conn.recv(MAX_DATA_ERCV)
+def BPS(proxy, conn, client_addr):
+    request = conn.recv(MAX_DATA_RECV)
     got = getaddr_port(request)
     (firstline, webserver, port) = (got[0],got[1],got[2])
-    print (firstline, client_addr) 
+    print firstline
+    print client_addr 
     thread.start_new_thread(SPB,(request, conn, webserver, port))
+
     
 def SPB(request, conn, webserver, port):
     try:
@@ -40,7 +42,7 @@ def SPB(request, conn, webserver, port):
         s.send(request)
 
         while 1:
-            data = s.recv(MAX_DATA_ERCV)
+            data = s.recv(MAX_DATA_RECV)
 
             if (len(data) > 0):
                 conn.send(data)
