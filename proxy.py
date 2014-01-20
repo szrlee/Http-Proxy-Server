@@ -2,35 +2,41 @@
 import thread
 import sys
 import os
+
 backlog = 50
-MAX_DATA_ERCV =81920
+MAX_DATA_ERCV = 81920
 
 def main():
     host = ''
-    port = 8081
+    port = 8089
     try:
-        proxy = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         proxy.bind((host, port))
         proxy.listen(backlog)
-    except socket.error , (value,message):
+    except socket.error, (value, message):
         if proxy:
             proxy.close()
-        print "Could not open socket:",message
+        print "Could not open socket:", message
         sys.exit(1)
+
     while 1:
         #create a BP socket
-        conn, addr = proxy.accept()
-        thread.start_new_thread(BPS,(conn,addr))
+        conn, client_addr = proxy.accept()
+        thread.start_new_thread(BPS, (conn, client_addr))
+            
     proxy.close()
 
-def BPS(conn,addr):
+def BPS(conn, client_addr):
     request = conn.recv(MAX_DATA_ERCV)
-    webserver = getaddr_port(request)[0]
-    port = getaddr_port(request)[1]
-    print webserver,port
+    got = getaddr_port(request)
+    (firstline, webserver, port) = (got[0],got[1],got[2])
+    print (firstline, client_addr) 
+    thread.start_new_thread(SPB,(request, conn, webserver, port))
+    
+def SPB(request, conn, webserver, port):
     try:
-        s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        s.connect((webserver,port))
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((webserver, port))
         s.send(request)
 
         while 1:
@@ -42,7 +48,7 @@ def BPS(conn,addr):
                 break
         s.close()
         conn.close()
-    except socket.error, (value,message):
+    except socket.error, (value, message):
         if s:
             s.close()
         if conn:
@@ -64,17 +70,22 @@ def getaddr_port(request):
 
     port_pos = temp.find(':')
 
-    host_pos = temp.find('/')
-    if host_pos == -1:
+    webserver_pos = temp.find('/')
+
+    if webserver_pos== -1:
         length = len(temp)
-    
+   
+    webserver = ''
+    port = -1
+
     if port_pos == -1 or length < port_pos:
-        webserver = temp
+        webserver = temp[:webserver_pos]
         port = 80
     else:
-        port = int(temp[(port_pos+1):])
+        port = int((temp[(port_pos+1):])[:webserver_pos-port_pos-1])
         webserver = temp[:(port_pos)]
-    return [webserver,port]
+    
+    return [firstline, webserver, port]
     
 
 
